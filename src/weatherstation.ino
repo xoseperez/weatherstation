@@ -20,7 +20,7 @@
 
 #include <math.h>
 #include <LowPower.h>
-#include <DHT.h>
+#include <DHT22.h>
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 
@@ -45,17 +45,16 @@
 #define BATT_PIN 0
 #define PANEL_PIN 1
 #define XBEE_SLEEP_PIN 4
-#define DHT_PIN 5
+#define DHT_PIN 12
 
 #define DHT_TYPE DHT22
 #define VOLTAGE_REFERENCE 1100
 #define BATT_VOLTAGE_FACTOR 4.06
 #define PANEL_VOLTAGE_FACTOR 4.06
-#define ONBOARD_TEMPERATURE_SLOPE 0.9338
-#define ONBOARD_TEMPERATURE_OFFSET -282.7
 #define XBEE_DELAY 20
 
 #define SLEEP_INTERVAL SLEEP_2S
+#define WARMUP_DELAY 2000
 #define MEASURE_EVERY 1
 #define SEND_EVERY 5
 
@@ -70,11 +69,11 @@ struct measure {
 // Globals
 // ===========================================
 
-DHT dht(DHT_PIN, DHT_TYPE);
+DHT22 dht(DHT_PIN);
 Adafruit_BMP085 bmp;
 
 boolean bmp_ready = false;
-long interval = 0;
+unsigned long interval = 0;
 
 struct measure dht22_temperature = {0,0,0,0};
 struct measure dht22_humidity = {0,0,0,0};
@@ -124,7 +123,7 @@ float readTemperature() {
     while (bit_is_set(ADCSRA,ADSC));
     resultTemp = ADCL;
     resultTemp |= ADCH<<8;
-    return (float) resultTemp * ONBOARD_TEMPERATURE_SLOPE + ONBOARD_TEMPERATURE_OFFSET; // Apply calibration correction
+    return (float) resultTemp;
 }
 
 // dewPoint function NOAA
@@ -181,8 +180,14 @@ float get_average(measure magnitude) {
 
 void readAll() {
 
-    record(dht22_temperature, dht.readTemperature());
-    record(dht22_humidity, dht.readHumidity());
+    delay(WARMUP_DELAY);
+
+    DHT22_ERROR_t errorCode = dht.readData();
+    if (errorCode == DHT_ERROR_NONE) {
+        record(dht22_temperature, dht.getTemperatureC());
+        record(dht22_humidity, dht.getHumidity());
+    }
+
     if (bmp_ready) {
         record(bmp085_temperature, bmp.readTemperature());
         record(bmp085_pressure, bmp.readPressure());
@@ -199,6 +204,8 @@ void readAll() {
 void sendAll() {
 
     xbeeWake();
+
+    Serial.println("");
 
     Serial.print(F("dht22_temperature:"));
     float temperature = get_average(dht22_temperature);
@@ -263,8 +270,7 @@ void setup() {
 
 void loop() {
     ++interval;
-    Serial.println(interval);
-    delay(20);
+    Serial.print(".");
     if (interval % MEASURE_EVERY == 0) {
         readAll();
     }
