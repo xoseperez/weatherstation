@@ -18,7 +18,6 @@
 
 */
 
-#include <math.h>
 #include <LowPower.h>
 #include <DHT22.h>
 #include <Wire.h>
@@ -197,7 +196,6 @@ void readAll() {
 
     //long vb = readVoltage(BATT_PIN, BATT_VOLTAGE_FACTOR);
     //long vp = readVoltage(PANEL_PIN, PANEL_VOLTAGE_FACTOR);
-    //long vi = readVoltage();
 
 }
 
@@ -262,9 +260,7 @@ void setup() {
     Serial.begin(9600);
 
     // Initialize BMP085
-    if (!(bmp_ready = (bool) bmp.begin())) {
-        Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-    }
+    bmp_ready = (bool) bmp.begin();
 
 }
 
@@ -276,6 +272,7 @@ void loop() {
     }
     if (interval % SEND_EVERY == 0) {
         sendAll();
+        interval = 0;
     }
     LowPower.powerDown(SLEEP_INTERVAL, ADC_OFF, BOD_OFF);
 }
