@@ -105,6 +105,8 @@
 #              If unspecified, an attempt is made to determine the name of a
 #              connected Arduino's serial device.
 #
+# BAUDRATE     Defaults to 9600
+#
 # SOURCES      A list of all source files of whatever language.  The language
 #              type is determined by the file extension.  This is set
 #              automatically if a .ino (or .pde) is found.
@@ -182,6 +184,10 @@ ifeq "$(SERIALDEV)" ""
 SERIALDEV := $(firstword $(wildcard \
 	/dev/ttyACM? /dev/ttyUSB? /dev/tty.usbserial* /dev/tty.usbmodem*))
 SERIALDEVGUESS := 1
+endif
+
+ifeq "$(BAUDRATE)" ""
+BAUDRATE := 9600
 endif
 
 # software
@@ -312,7 +318,7 @@ monitor:
 	@test 0 -eq $(SERIALDEVGUESS) || { \
 		echo "*GUESSING* at serial device:" $(SERIALDEV); \
 		echo; }
-	screen $(SERIALDEV) 9600,cs8
+	screen $(SERIALDEV) $(BAUDRATE),cs8
 
 size: $(TARGET).elf
 	echo && $(AVRSIZE) --format=avr --mcu=$(BOARD_BUILD_MCU) $(TARGET).elf
