@@ -49,12 +49,14 @@
 #define PANEL_PIN 1
 #define XBEE_SLEEP_PIN 4
 #define DHT_PIN 12
+#define NOTIFICATION_PIN 13
 
 #define DHT_TYPE DHT22
 #define VOLTAGE_REFERENCE 3300
 #define BATT_VOLTAGE_FACTOR 4.24 // 100KOhm + 324KOhm
 #define PANEL_VOLTAGE_FACTOR 6.61 // 100kOhm + 561kOhm
 #define XBEE_DELAY 40
+#define XBEE_LINK 4000
 
 #define SLEEP_INTERVAL SLEEP_2S
 #define MEASURE_EVERY 28 // each measurement takes roughly 4 seconds
@@ -100,7 +102,7 @@ struct measure panel_voltages = {0,0,0,0};
  */
 void xbeeSleep() {
     delay(XBEE_DELAY);
-    pinMode(XBEE_SLEEP_PIN, INPUT_PULLUP);
+    pinMode(XBEE_SLEEP_PIN, HIGH);
 }
 
 /*
@@ -110,7 +112,6 @@ void xbeeSleep() {
  * @return void
  */
 void xbeeWake() {
-    pinMode(XBEE_SLEEP_PIN, OUTPUT);
     digitalWrite(XBEE_SLEEP_PIN, LOW);
     delay(XBEE_DELAY);
 }
@@ -371,8 +372,14 @@ void setup() {
     // Initialize BMP085
     bmp_ready = (bool) bmp.begin();
 
-    // Make the radio LED blink
+    // Link radio
+    pinMode(XBEE_SLEEP_PIN, OUTPUT);
+    pinMode(NOTIFICATION_PIN, OUTPUT);
     xbeeWake();
+    digitalWrite(NOTIFICATION_PIN, HIGH);
+    delay(XBEE_LINK);
+    Serial.println(F("STATUS:1"));
+    digitalWrite(NOTIFICATION_PIN, LOW);
     xbeeSleep();
 
 }
@@ -385,6 +392,7 @@ void setup() {
 void loop() {
     ++interval;
     if (interval % MEASURE_EVERY == 0) {
+        digitalWrite(NOTIFICATION_PIN, HIGH);
         readAll();
         interval = 0;
         ++measures;
@@ -393,6 +401,7 @@ void loop() {
             resetAll();
             measures = 0;
         }
+        digitalWrite(NOTIFICATION_PIN, LOW);
     }
     LowPower.powerDown(SLEEP_INTERVAL, ADC_OFF, BOD_OFF);
 }
