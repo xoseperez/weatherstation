@@ -23,6 +23,7 @@
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <LLAPSerial.h>
+#include <PCF8583.h>
 #include <Magnitude.h>
 
 // DHT22 connections:
@@ -31,7 +32,7 @@
 // Connect pin 4 (on the right) of the sensor to GROUND
 // Connect a 10K resistor from pin 2 (data) to pin 1 (power) of the sensor
 
-// BMP085 connections:
+// BMP085 and PCF8586 connections:
 // Connect VCC of the sensor to 3.3V (NOT 5.0V!)
 // Connect GND to Ground
 // Connect SCL to i2c clock - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 5
@@ -50,16 +51,17 @@
 #define BATT_PIN 0
 #define PANEL_PIN 1
 #define RADIO_SLEEP_PIN 4
-#define DHT_PIN 12
+#define DHT_PIN 5
+#define ANEMOMETER_ADDRESS 0xA0
+#define RAIN_GAUGE_ADDRESS 0xA2
 #define NOTIFICATION_PIN 13
 
 #define DHT_TYPE DHT22
 #define VOLTAGE_REFERENCE_VALUE 1100
 #define VOLTAGE_REFERENCE_CODE INTERNAL
 #define BATT_VOLTAGE_FACTOR 4.24 // 100KOhm + 324KOhm
-#define PANEL_VOLTAGE_FACTOR 6.61 // 100kOhm + 561kOhm
+#define PANEL_VOLTAGE_FACTOR 9.2 // 100kOhm + 820kOhm
 #define RADIO_DELAY 100
-#define RADIO_LINK 4000
 
 #define SLEEP_INTERVAL SLEEP_4S
 #define MEASURE_EVERY 14 // each measurement takes roughly 4 seconds
@@ -73,6 +75,8 @@
 DHT22 dht(DHT_PIN);
 Adafruit_BMP085 bmp;
 LLAPSerial LLAP(Serial);
+PCF8583 anemometer(ANEMOMETER_ADDRESS);
+PCF8583 rain_gauge(RAIN_GAUGE_ADDRESS);
 
 boolean bmp_ready = false;
 unsigned long interval = 0;
@@ -84,6 +88,8 @@ Magnitude bmp085_pressure;
 Magnitude bmp085_temperature;
 Magnitude battery_voltage;
 Magnitude panel_voltage;
+Magnitude anemometer_count;
+Magnitude rain_gauge_count;
 
 // ===========================================
 // Methods
@@ -172,12 +178,48 @@ float dewPoint(float temperature, float humidity) {
 #endif
 
 /*
- * readAll
- * Reads all magnitudes and stores them in metric structures
+ * readAnemometer
+ * 
+ * Reads anemometer counter
+ */
+void readAnemometer() {
+
+    static unsigned long previous = 0;
+    unsigned long current = anemometer.getCount();
+
+    float difference = current - previous;
+    if (difference < 0) difference += 1000000.0;
+    anemometer_count.store(difference);
+
+    previous = current;
+
+}
+
+/*
+ * readRainGauge
+ * 
+ * Reads rain count gauge counter
+ */
+void readRainGauge() {
+
+    static unsigned long previous = 0;
+    unsigned long current = rain_gauge.getCount();
+
+    float difference = current - previous;
+    if (difference < 0) difference += 1000000.0;
+    rain_gauge_count.store(difference);
+
+    previous = current;
+
+}
+
+/*
+ * readDHT22
+ * Reads humidity and temperature from DHT22
  *
  * @return void
  */
-void readAll() {
+void readDHT22() {
 
     // Allowing the DHT22 to warm up
     delay(WARMUP_DELAY);
@@ -188,10 +230,30 @@ void readAll() {
         dht22_humidity.store(dht.getHumidity());
     }
 
+}
+
+/*
+ * readBMP085
+ * Reads pressure and temperature from BMP085
+ *
+ * @return void
+ */
+void readBMP085() {
+
     if (bmp_ready) {
         bmp085_temperature.store(bmp.readTemperature());
         bmp085_pressure.store(bmp.readPressure());
     }
+
+}
+
+/*
+ * readVoltages
+ * Reads voltages for battery and solar panel
+ *
+ * @return void
+ */
+void readVoltages() {
 
     battery_voltage.store((float) readVoltage(BATT_PIN, BATT_VOLTAGE_FACTOR));
     panel_voltage.store((float) readVoltage(PANEL_PIN, PANEL_VOLTAGE_FACTOR));
@@ -211,6 +273,8 @@ void resetAll() {
     bmp085_pressure.reset();
     battery_voltage.reset();
     panel_voltage.reset();
+    anemometer_count.reset();
+    rain_gauge_count.reset();
 }
 
 /*
@@ -228,6 +292,9 @@ void sendAll() {
     float prs = bmp085_pressure.average();
     float bat1 = battery_voltage.average();
     float bat2 = panel_voltage.average();
+    float wnd = anemometer_count.average() * 5 / 16; // 1c/s = 2.5km/h, the buckets are 4 seconds wide, and it counts double!!
+    float wndx = anemometer_count.maximum() * 5 / 16;
+    float rain = rain_gauge_count.sum() * 3 / 20; // 0.3mm per count, the counter counts double!!
 
     radioWake();
 
@@ -239,9 +306,15 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage(PSTR("PRS"), prs, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("BAT1"), bat1, 1);
+    LLAP.sendMessage(PSTR("WND"), wnd, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("BAT2"), bat2, 1);
+    LLAP.sendMessage(PSTR("WNDX"), wndx, 1);
+    delay(RADIO_DELAY);
+    LLAP.sendMessage(PSTR("RAIN"), rain, 1);
+    delay(RADIO_DELAY);
+    LLAP.sendMessage(PSTR("BAT1"), bat1, 0);
+    delay(RADIO_DELAY);
+    LLAP.sendMessage(PSTR("BAT2"), bat2, 0);
 
     radioSleep();
 
@@ -257,11 +330,13 @@ void setup() {
     // Using the ADC against internal 1V1 reference for battery monitoring
     analogReference(VOLTAGE_REFERENCE_CODE);
 
-    // Initialize UART
+    // Initialize UART, LLAP, PCF8583 and BMP085
     Serial.begin(BAUD_RATE);
     LLAP.setLocalID("AB");
-
-    // Initialize BMP085
+    anemometer.setMode(MODE_EVENT_COUNTER);
+    anemometer.setCount(0);
+    rain_gauge.setMode(MODE_EVENT_COUNTER);
+    rain_gauge.setCount(0);
     bmp_ready = (bool) bmp.begin();
 
     // Link radio
@@ -282,16 +357,30 @@ void setup() {
  * @return void
  */
 void loop() {
+
+    // Always take a wind measure
+    readAnemometer();
+
+    // Now, every MEASURE_EVERY intervals (1 minute) take the rest of measures
     interval = ++interval % MEASURE_EVERY;
     if (interval == 0) {
+
         digitalWrite(NOTIFICATION_PIN, HIGH);
-        readAll();
+        readDHT22();
+        readBMP085();
+        readVoltages();
+        readRainGauge();
+
+        // Every 5 minutes send measures
         measures = ++measures % SEND_EVERY;
         if (measures == 0) {
             sendAll();
             resetAll();
         }
+
         digitalWrite(NOTIFICATION_PIN, LOW);
+
     }
+
     LowPower.powerDown(SLEEP_INTERVAL, ADC_OFF, BOD_OFF);
 }

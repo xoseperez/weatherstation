@@ -63,3 +63,19 @@ float Magnitude::average() {
         return 0.0;
     }
 }
+
+float Magnitude::count() {
+    return _count;
+}
+
+float Magnitude::sum() {
+    return _sum;
+}
+
+float Magnitude::minimum() {
+    return _minimum;
+}
+
+float Magnitude::maximum() {
+    return _maximum;
+}

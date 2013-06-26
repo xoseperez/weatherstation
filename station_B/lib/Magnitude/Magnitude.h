@@ -19,30 +19,28 @@
 */
 
 #ifndef _MAGNITUDE_h
+#define _MAGNITUDE_h
 
-    #define _MAGNITUDE_h
+class Magnitude {
 
-    class Magnitude {
+    private:
 
-        private:
+        unsigned long _count;
+        float _sum;
+        float _maximum;
+        float _minimum;
+    
+    public:
 
-            unsigned long _count;
-            float _sum;
-            float _maximum;
-            float _minimum;
+        Magnitude();
+        void reset();
+        void store(float value);
+        float average();
+        float maximum();
+        float minimum();
+        float sum();
+        float count();
 
-        public:
-
-            Magnitude();
-            void reset();
-            void store(float value);
-            float average();
-            float maximum();
-            float minimum();
-            float count();
-
-
-    };
+};
 
 #endif
-
