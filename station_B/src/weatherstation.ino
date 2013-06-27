@@ -302,11 +302,11 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage(PSTR("TMP2"), tmp2, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("HUM"), hum, 1);
+    LLAP.sendMessage(PSTR("HUMI"), hum, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("PRS"), prs, 1);
+    LLAP.sendMessage(PSTR("PRES"), prs, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("WND"), wnd, 1);
+    LLAP.sendMessage(PSTR("WIND"), wnd, 1);
     delay(RADIO_DELAY);
     LLAP.sendMessage(PSTR("WNDX"), wndx, 1);
     delay(RADIO_DELAY);
