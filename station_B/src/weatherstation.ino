@@ -67,7 +67,8 @@
 #define MEASURE_EVERY 14 // each measurement takes roughly 4 seconds
 #define SEND_EVERY 5
 #define WARMUP_DELAY 2000
-#define STAT_INTERVAL 3000000 // 5 minutes
+
+//#define DEBUG
 
 // ===========================================
 // Globals
@@ -128,6 +129,13 @@ void radioWake() {
  */
 long readVoltage(byte pin, float factor) {
     int reading = analogRead(pin);
+    #ifdef DEBUG
+        Serial.print("Voltage reading for PIN ");
+        Serial.print(pin);
+        Serial.print(": ");
+        Serial.println(reading);
+        delay(20);
+    #endif
     return (long) map(reading, 0, 1023, 0, VOLTAGE_REFERENCE_VALUE) * factor;
 }
 
@@ -187,10 +195,20 @@ void readAnemometer() {
 
     static unsigned long previous = 0;
     unsigned long current = anemometer.getCount();
+    #ifdef DEBUG
+        Serial.print("Anemometer count: ");
+        Serial.println(current);
+        delay(20);
+    #endif
 
-    float difference = current - previous;
-    if (difference < 0) difference += 1000000.0;
-    anemometer_count.store(difference);
+    float delta = current - previous;
+    if (delta < 0) delta += 1000000.0;
+    anemometer_count.store(delta);
+    #ifdef DEBUG
+        Serial.print("Anemometer delta: ");
+        Serial.println(delta);
+        delay(20);
+    #endif
 
     previous = current;
 
@@ -205,10 +223,20 @@ void readRainGauge() {
 
     static unsigned long previous = 0;
     unsigned long current = rain_gauge.getCount();
+    #ifdef DEBUG
+        Serial.print("Rain gauge count: ");
+        Serial.println(current);
+        delay(20);
+    #endif
 
-    float difference = current - previous;
-    if (difference < 0) difference += 1000000.0;
-    rain_gauge_count.store(difference);
+    float delta = current - previous;
+    if (delta < 0) delta += 1000000.0;
+    rain_gauge_count.store(delta);
+    #ifdef DEBUG
+        Serial.print("Rain gauge delta: ");
+        Serial.println(delta);
+        delay(20);
+    #endif
 
     previous = current;
 
@@ -228,7 +256,17 @@ void readDHT22() {
     DHT22_ERROR_t errorCode = dht.readData();
     if (errorCode == DHT_ERROR_NONE) {
         dht22_temperature.store(dht.getTemperatureC());
+        #ifdef DEBUG
+            Serial.print("DHT22 temperature: ");
+            Serial.println(dht.getTemperatureC());
+            delay(20);
+        #endif
         dht22_humidity.store(dht.getHumidity());
+        #ifdef DEBUG
+            Serial.print("DHT22 humidity: ");
+            Serial.println(dht.getHumidity());
+            delay(20);
+        #endif
     }
 
 }
@@ -243,7 +281,17 @@ void readBMP085() {
 
     if (bmp_ready) {
         bmp085_temperature.store(bmp.readTemperature());
+        #ifdef DEBUG
+            Serial.print("BMP085 temperature: ");
+            Serial.println(bmp.readTemperature());
+            delay(20);
+        #endif
         bmp085_pressure.store(bmp.readPressure());
+        #ifdef DEBUG
+            Serial.print("BMP085 pressure: ");
+            Serial.println(bmp.readPressure());
+            delay(20);
+        #endif
     }
 
 }
@@ -290,7 +338,7 @@ void sendAll() {
     float humi = dht22_humidity.average();
     float dewp = dewPoint(tmp1, humi);
     float tmp2 = bmp085_temperature.average();
-    float pres = bmp085_pressure.average();
+    float pres = bmp085_pressure.average() / 100.0; // in hPa
     float bat1 = battery_voltage.average();
     float bat2 = panel_voltage.average();
     float wind = anemometer_count.average() * 5 / 16; // 1c/s = 2.5km/h, the buckets are 4 seconds wide, and it counts double!!
@@ -299,25 +347,25 @@ void sendAll() {
 
     radioWake();
 
-    LLAP.sendMessage(PSTR("TMP1"), tmp1, 1);
+    LLAP.sendMessage("T1", tmp1, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("TMP2"), tmp2, 1);
+    LLAP.sendMessage("T2", tmp2, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("HUMI"), humi, 1);
+    LLAP.sendMessage("HM", humi, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("PRES"), pres, 1);
+    LLAP.sendMessage("PS", pres, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("DEWP"), dewp, 1);
+    LLAP.sendMessage("DP", dewp, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("WIND"), wind, 1);
+    LLAP.sendMessage("WD", wind, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("WNDX"), wndx, 1);
+    LLAP.sendMessage("WX", wndx, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("RAIN"), rain, 1);
+    LLAP.sendMessage("RN", rain, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("BAT1"), bat1, 0);
+    LLAP.sendMessage("B1", bat1, 0);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("BAT2"), bat2, 0);
+    LLAP.sendMessage("B2", bat2, 0);
 
     radioSleep();
 
