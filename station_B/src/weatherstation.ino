@@ -59,14 +59,15 @@
 #define DHT_TYPE DHT22
 #define VOLTAGE_REFERENCE_VALUE 1100
 #define VOLTAGE_REFERENCE_CODE INTERNAL
-#define BATT_VOLTAGE_FACTOR 4.24 // 100KOhm + 324KOhm
-#define PANEL_VOLTAGE_FACTOR 9.2 // 100kOhm + 820kOhm
+#define BATT_VOLTAGE_FACTOR 4.28 // 99.8KOhm + 327.4KOhm
+#define PANEL_VOLTAGE_FACTOR 9.09 // 100.2kOhm + 811kOhm
 #define RADIO_DELAY 100
 
 #define SLEEP_INTERVAL SLEEP_4S
 #define MEASURE_EVERY 14 // each measurement takes roughly 4 seconds
 #define SEND_EVERY 5
 #define WARMUP_DELAY 2000
+#define STAT_INTERVAL 3000000 // 5 minutes
 
 // ===========================================
 // Globals
@@ -286,13 +287,13 @@ void resetAll() {
 void sendAll() {
 
     float tmp1 = dht22_temperature.average();
-    float hum = dht22_humidity.average();
-    float dew = dewPoint(tmp1, hum);
+    float humi = dht22_humidity.average();
+    float dewp = dewPoint(tmp1, humi);
     float tmp2 = bmp085_temperature.average();
-    float prs = bmp085_pressure.average();
+    float pres = bmp085_pressure.average();
     float bat1 = battery_voltage.average();
     float bat2 = panel_voltage.average();
-    float wnd = anemometer_count.average() * 5 / 16; // 1c/s = 2.5km/h, the buckets are 4 seconds wide, and it counts double!!
+    float wind = anemometer_count.average() * 5 / 16; // 1c/s = 2.5km/h, the buckets are 4 seconds wide, and it counts double!!
     float wndx = anemometer_count.maximum() * 5 / 16;
     float rain = rain_gauge_count.sum() * 3 / 20; // 0.3mm per count, the counter counts double!!
 
@@ -302,11 +303,13 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage(PSTR("TMP2"), tmp2, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("HUMI"), hum, 1);
+    LLAP.sendMessage(PSTR("HUMI"), humi, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("PRES"), prs, 1);
+    LLAP.sendMessage(PSTR("PRES"), pres, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage(PSTR("WIND"), wnd, 1);
+    LLAP.sendMessage(PSTR("DEWP"), dewp, 1);
+    delay(RADIO_DELAY);
+    LLAP.sendMessage(PSTR("WIND"), wind, 1);
     delay(RADIO_DELAY);
     LLAP.sendMessage(PSTR("WNDX"), wndx, 1);
     delay(RADIO_DELAY);
