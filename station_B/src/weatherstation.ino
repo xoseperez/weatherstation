@@ -106,6 +106,7 @@ Magnitude rain_gauge_count;
 void radioSleep() {
     delay(RADIO_DELAY);
     pinMode(RADIO_SLEEP_PIN, HIGH);
+    digitalWrite(NOTIFICATION_PIN, LOW);
 }
 
 /*
@@ -115,6 +116,7 @@ void radioSleep() {
  * @return void
  */
 void radioWake() {
+    digitalWrite(NOTIFICATION_PIN, HIGH);
     digitalWrite(RADIO_SLEEP_PIN, LOW);
     delay(RADIO_DELAY);
 }
@@ -371,6 +373,48 @@ void sendAll() {
 
 }
 
+boolean waitForOK(unsigned long timeout = 1000) {
+    timeout = millis() + timeout;
+    while (Serial.available() < 2 && millis() < timeout);
+    if (Serial.available() < 2) return false;
+    if (Serial.read() != 'O') return false;
+    if (Serial.read() != 'K') return false;
+    return true;
+}
+
+void setupRadio() {
+
+    pinMode(RADIO_SLEEP_PIN, OUTPUT);
+    pinMode(NOTIFICATION_PIN, OUTPUT);
+
+    radioWake();
+
+    // start command mode
+    delay(1000);
+    Serial.flush();
+    Serial.print("+++");
+    waitForOK();
+
+    // send SM1 command
+    Serial.flush();
+    Serial.print("ATSM1");
+    waitForOK();
+
+    // save changes
+    //Serial.print("ATWR");
+    //waitForOK();
+
+    // stop command mode
+    Serial.flush();
+    Serial.print("ATDN");
+
+    // say hello
+    LLAP.sendMessage("ST", "1");
+
+    radioSleep();
+
+}
+
 /*
  * setup
  *
@@ -391,14 +435,7 @@ void setup() {
     bmp_ready = (bool) bmp.begin();
 
     // Link radio
-    pinMode(RADIO_SLEEP_PIN, OUTPUT);
-    pinMode(NOTIFICATION_PIN, OUTPUT);
-
-    radioWake();
-    digitalWrite(NOTIFICATION_PIN, HIGH);
-    LLAP.sendMessage("HELLO", "");
-    digitalWrite(NOTIFICATION_PIN, LOW);
-    radioSleep();
+    setupRadio();
 
 }
 
@@ -416,7 +453,6 @@ void loop() {
     interval = ++interval % MEASURE_EVERY;
     if (interval == 0) {
 
-        digitalWrite(NOTIFICATION_PIN, HIGH);
         readDHT22();
         readBMP085();
         readVoltages();
@@ -428,8 +464,6 @@ void loop() {
             sendAll();
             resetAll();
         }
-
-        digitalWrite(NOTIFICATION_PIN, LOW);
 
     }
 
