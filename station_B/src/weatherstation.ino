@@ -63,10 +63,15 @@
 #define PANEL_VOLTAGE_FACTOR 9.09 // 100.2kOhm + 811kOhm
 #define RADIO_DELAY 100
 
+// Every measure takes rougly 1.35 seconds (1.3 being the warmup bellow)
+// Sending adds 1.23 seconds to that
+// The total awake time for a 5 measures cicle is (1.35*5+1.23 ~= 8 seconds)
+// Besides, the sleep code is not very precise...
+
 #define SLEEP_INTERVAL SLEEP_4S
-#define MEASURE_EVERY 14 // each measurement takes roughly 4 seconds
-#define SEND_EVERY 5
-#define WARMUP_DELAY 2000
+#define MEASURE_EVERY 14 // take one measure every minute
+#define SEND_EVERY 70 // that's 14*5
+#define WARMUP_DELAY 1300
 
 //#define DEBUG
 
@@ -82,7 +87,6 @@ PCF8583 rain_gauge(RAIN_GAUGE_ADDRESS);
 
 boolean bmp_ready = false;
 unsigned long interval = 0;
-unsigned long measures = 0;
 
 Magnitude dht22_temperature;
 Magnitude dht22_humidity;
@@ -105,7 +109,7 @@ Magnitude rain_gauge_count;
  */
 void radioSleep() {
     delay(RADIO_DELAY);
-    pinMode(RADIO_SLEEP_PIN, HIGH);
+    digitalWrite(RADIO_SLEEP_PIN, HIGH);
     digitalWrite(NOTIFICATION_PIN, LOW);
 }
 
@@ -349,15 +353,15 @@ void sendAll() {
 
     radioWake();
 
-    LLAP.sendMessage("T1", tmp1, 1);
+    LLAP.sendMessage("T1", tmp1, 2);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("T2", tmp2, 1);
+    LLAP.sendMessage("T2", tmp2, 2);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("HM", humi, 1);
+    LLAP.sendMessage("HM", humi, 2);
     delay(RADIO_DELAY);
     LLAP.sendMessage("PS", pres, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("DP", dewp, 1);
+    LLAP.sendMessage("DP", dewp, 2);
     delay(RADIO_DELAY);
     LLAP.sendMessage("WD", wind, 1);
     delay(RADIO_DELAY);
@@ -368,48 +372,6 @@ void sendAll() {
     LLAP.sendMessage("B1", bat1, 0);
     delay(RADIO_DELAY);
     LLAP.sendMessage("B2", bat2, 0);
-
-    radioSleep();
-
-}
-
-boolean waitForOK(unsigned long timeout = 1000) {
-    timeout = millis() + timeout;
-    while (Serial.available() < 2 && millis() < timeout);
-    if (Serial.available() < 2) return false;
-    if (Serial.read() != 'O') return false;
-    if (Serial.read() != 'K') return false;
-    return true;
-}
-
-void setupRadio() {
-
-    pinMode(RADIO_SLEEP_PIN, OUTPUT);
-    pinMode(NOTIFICATION_PIN, OUTPUT);
-
-    radioWake();
-
-    // start command mode
-    delay(1000);
-    Serial.flush();
-    Serial.print("+++");
-    waitForOK();
-
-    // send SM1 command
-    Serial.flush();
-    Serial.print("ATSM1");
-    waitForOK();
-
-    // save changes
-    //Serial.print("ATWR");
-    //waitForOK();
-
-    // stop command mode
-    Serial.flush();
-    Serial.print("ATDN");
-
-    // say hello
-    LLAP.sendMessage("ST", "1");
 
     radioSleep();
 
@@ -435,7 +397,12 @@ void setup() {
     bmp_ready = (bool) bmp.begin();
 
     // Link radio
-    setupRadio();
+    pinMode(RADIO_SLEEP_PIN, OUTPUT);
+    pinMode(NOTIFICATION_PIN, OUTPUT);
+    radioWake();
+    delay(2000);
+    LLAP.sendMessage("ST", "1");
+    radioSleep();
 
 }
 
@@ -449,23 +416,23 @@ void loop() {
     // Always take a wind measure
     readAnemometer();
 
-    // Now, every MEASURE_EVERY intervals (1 minute) take the rest of measures
-    interval = ++interval % MEASURE_EVERY;
-    if (interval == 0) {
+    ++interval;
 
+    // Now, every MEASURE_EVERY intervals (1 minute) take the rest of measures
+    if (interval % MEASURE_EVERY == 0) {
         readDHT22();
         readBMP085();
         readVoltages();
         readRainGauge();
+    }
 
-        // Every 5 minutes send measures
-        measures = ++measures % SEND_EVERY;
-        if (measures == 0) {
-            sendAll();
-            resetAll();
-        }
-
+    // And every SEND_EVERY intervals (5 minutes) send messages
+    if (interval % SEND_EVERY == 0) {
+        sendAll();
+        resetAll();
+        interval = 0;
     }
 
     LowPower.powerDown(SLEEP_INTERVAL, ADC_OFF, BOD_OFF);
+
 }
