@@ -369,9 +369,9 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage("WX", wndx, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("R5", rain, 1);
+    LLAP.sendMessage("R1", rain, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("RH", rain_hour, 1);
+    LLAP.sendMessage("R2", rain_hour, 1);
     delay(RADIO_DELAY);
     LLAP.sendMessage("B1", bat1, 0);
     delay(RADIO_DELAY);
