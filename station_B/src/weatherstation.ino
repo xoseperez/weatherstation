@@ -25,6 +25,7 @@
 #include <LLAPSerial.h>
 #include <PCF8583.h>
 #include <Magnitude.h>
+#include <MovingData.h>
 
 // DHT22 connections:
 // Connect pin 1 (on the left) of the sensor to 3.3V
@@ -95,7 +96,7 @@ Magnitude bmp085_temperature;
 Magnitude battery_voltage;
 Magnitude panel_voltage;
 Magnitude anemometer_count;
-Magnitude rain_gauge_count;
+MovingData rain_hourly_count(12);
 
 // ===========================================
 // Methods
@@ -225,7 +226,7 @@ void readAnemometer() {
  * 
  * Reads rain count gauge counter
  */
-void readRainGauge() {
+float readRainGauge() {
 
     static unsigned long previous = 0;
     unsigned long current = rain_gauge.getCount();
@@ -237,7 +238,6 @@ void readRainGauge() {
 
     float delta = current - previous;
     if (delta < 0) delta += 1000000.0;
-    rain_gauge_count.store(delta);
     #ifdef DEBUG
         Serial.print("Rain gauge delta: ");
         Serial.println(delta);
@@ -245,6 +245,7 @@ void readRainGauge() {
     #endif
 
     previous = current;
+    return delta;
 
 }
 
@@ -329,7 +330,6 @@ void resetAll() {
     battery_voltage.reset();
     panel_voltage.reset();
     anemometer_count.reset();
-    rain_gauge_count.reset();
 }
 
 /*
@@ -349,7 +349,9 @@ void sendAll() {
     float bat2 = panel_voltage.average();
     float wind = anemometer_count.average() * 5 / 16; // 1c/s = 2.5km/h, the buckets are 4 seconds wide, and it counts double!!
     float wndx = anemometer_count.maximum() * 5 / 16;
-    float rain = rain_gauge_count.sum() * 3 / 20; // 0.3mm per count, the counter counts double!!
+    float rain = readRainGauge() * 3 / 20; // 0.3mm per count, the counter counts double!!
+    rain_hourly_count.store(rain);
+    float rain_hour = rain_hourly_count.sum();
 
     radioWake();
 
@@ -357,7 +359,7 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage("T2", tmp2, 2);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("HM", humi, 2);
+    LLAP.sendMessage("RH", humi, 2);
     delay(RADIO_DELAY);
     LLAP.sendMessage("PS", pres, 1);
     delay(RADIO_DELAY);
@@ -367,7 +369,9 @@ void sendAll() {
     delay(RADIO_DELAY);
     LLAP.sendMessage("WX", wndx, 1);
     delay(RADIO_DELAY);
-    LLAP.sendMessage("RN", rain, 1);
+    LLAP.sendMessage("R5", rain, 1);
+    delay(RADIO_DELAY);
+    LLAP.sendMessage("RH", rain_hour, 1);
     delay(RADIO_DELAY);
     LLAP.sendMessage("B1", bat1, 0);
     delay(RADIO_DELAY);
@@ -423,8 +427,7 @@ void loop() {
         readDHT22();
         readBMP085();
         readVoltages();
-        readRainGauge();
-    }
+	}
 
     // And every SEND_EVERY intervals (5 minutes) send messages
     if (interval % SEND_EVERY == 0) {
