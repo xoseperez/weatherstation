@@ -102,7 +102,7 @@ struct measure panel_voltages = {0,0,0,0};
  */
 void xbeeSleep() {
     delay(XBEE_DELAY);
-    pinMode(XBEE_SLEEP_PIN, HIGH);
+    digitalWrite(XBEE_SLEEP_PIN, HIGH);
 }
 
 /*
