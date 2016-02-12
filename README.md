@@ -15,5 +15,5 @@ Adafruit BMP085 Library
 https://github.com/adafruit/Adafruit-BMP085-Library
 
 Tinkerkit secret voltmeter & thermometer for the Arduino 328
-http://code.google.com/p/tinkerit/wiki/SecretVoltmeter
-http://code.google.com/p/tinkerit/wiki/SecretThermometer
+https://github.com/timofonic/tinkerit/blob/wiki/SecretThermometer.md
+https://github.com/timofonic/tinkerit/blob/wiki/SecretVoltmeter.md
