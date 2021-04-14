@@ -1,21 +1,38 @@
-# Weather Station
+# Moteino Weather Station
 
-Arduino FIO based weather station with a DHT22 temperature & humidity sensor and a BMP085 barometric preassure sensor.
-The whole sensor will be powered by a solar panel (doubling as irradiance sensor) and backed by a LiPo cell.
+This is a weather station based on **[Moteino WeatherShield R2][6]** with a BME260 Bosch sensor. The whole project has an average power consumption of 26uA and thus can be powered by a small LiPo battery for months or years.
+Check my **[Low Power Weather Station with BME280 and Moteino][1]** post for further information about this project, including **power consumption data and hardware modifications**.
 
-You can read about this project in my blog: [Weather Station](http://tinkerman.eldiariblau.net/weather-station/ "Weather Station").
+## Hardware
 
-## Dependencies
+![Moteino Weather Station](/images/20161009_021036s.jpg)
 
-Rocket Scream Lightweight Low Power Arduino Library
-https://github.com/rocketscream/Low-Power
+## Firmware
 
-Ben Adams' Arduino library for the DHT22 humidity and temperature sensor
-https://github.com/ringerc/Arduino-DHT22
+The code is very straight forward and there are comments where I thought it was important. It uses the following libraries:
 
-Adafruit BMP085 Library
-https://github.com/adafruit/Adafruit-BMP085-Library
+* **[RFM69_ATC][2]** by Felix Rusu and Thomas Studwell
+* **[Low-Power][3]** by RocketScream
+* **[BME280 Arduino Library][4]** by SparkFun
 
-Tinkerkit secret voltmeter & thermometer for the Arduino 328
-https://github.com/timofonic/tinkerit/blob/wiki/SecretThermometer.md
-https://github.com/timofonic/tinkerit/blob/wiki/SecretVoltmeter.md
+It also relies on my **RFM69Manager library** to wrap RFM69_ATC. This library manages radio setup and also message sending protocol. Messages from this node have the following format: ```<key>:<value>:<packetID>```. Packet ID is then used in the gateway to detect duplicates or missing packets from a node. If you don't want to send the packetID change the SEND_PACKET_ID value in RFM69Manager.h to 0.
+
+## Configuration
+
+Rename or copy the settings.h.sample file to settings.h and change its values to fit your needs. Check the descriptions for each value.
+
+## Flashing
+
+The project is ready to be build using **[PlatformIO][5]**.
+Please refer to their web page for instructions on how to install the builder. Once installed connect the Moteino to your favourite FTDI-like programmer and:
+
+```bash
+> platformio run --target upload
+```
+
+[1]: http://tinkerman.cat/low-power-weather-station-bme280-moteino/
+[2]: https://github.com/LowPowerLab/RFM69
+[3]: https://github.com/rocketscream/Low-Power/
+[4]: https://github.com/sparkfun/SparkFun_BME280_Arduino_Library
+[5]: http://www.platformio.org
+[6]: https://lowpowerlab.com/shop/product/123

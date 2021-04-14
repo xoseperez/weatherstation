@@ -8,3 +8,10 @@
 
 # Eagle
 *.s#?
+*.b#?
+.modgit
+firmware*
+.pio*
+*.gch
+.sconsign.dblite
+settings.h
